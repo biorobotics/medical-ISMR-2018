@@ -1,0 +1,13 @@
+# Blender MTL File: 'Jesus_Unity.blend'
+# Material Count: 1
+
+newmtl JesusCycles
+Ns 135.294118
+Ka 1.000000 1.000000 1.000000
+Kd 0.800000 0.800000 0.800000
+Ks 0.114089 0.133708 0.188000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd C:\Users\gnast\Documents\Work\Art\LambOfGod\JesusDiffuse.png
