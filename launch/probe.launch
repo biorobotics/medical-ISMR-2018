@@ -1,5 +1,5 @@
 <launch>
-  <arg name="path" default="package://oct_15_demo/resources/smallProstate.obj" />
+  <arg name="path" default="package://oct_15_demo/resources/largeProstate.obj" />
   <node name="probe_service" type="probe_2D_service.py" pkg="oct_15_demo" output="screen">
   	<param name="mesh_path" value="$(arg path)"/>
   </node>

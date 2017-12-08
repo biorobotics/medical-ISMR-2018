@@ -1,21 +1,30 @@
-<launch><!-- 
-  <arg name="mesh_path" default="package://dvrk_vision/defaults/femur.stl" />
-  <arg name="scale" default=".001" /> -->
+<launch>
+  <!--<arg name="mesh_path" default="package://dvrk_vision/defaults/pelvis.obj" />
+  <arg name="scale" default=".000975" />
+  <arg name="texture_path" default="package://oct_15_demo/resources/DiffuseHills.png"/>
+  <arg name="inlier_ratio" default=".8"/> -->
 
-<!--   <arg name="mesh_path" default="package://oct_15_demo/resources/HillOrgan.obj" />
+  <!--<arg name="mesh_path" default="package://oct_15_demo/resources/HillOrgan.obj" />
   <arg name="secondary_mesh_path" default="package://oct_15_demo/resources/HillOrganAnnotated.obj" />
   <arg name="texture_path" default="package://oct_15_demo/resources/DiffuseHills.png"/>
   <arg name="scale" default="1"/> -->
 
-  <!-- <arg name="mesh_path" default="package://oct_15_demo/resources/largeProstate.obj" />
-  <arg name="secondary_mesh_path" default="package://oct_15_demo/resources/largeProstate.obj" />
+  <arg name="mesh_path" default="package://oct_15_demo/resources/largeProstate.obj" />
+  <arg name="secondary_mesh_path" default="package://oct_15_demo/resources/largeProstateAnnotated.obj" />
   <arg name="texture_path" default="package://oct_15_demo/resources/largeProstate.png"/>
-  <arg name="scale" default="1.0526" /> -->
-
-  <arg name="mesh_path" default="package://oct_15_demo/resources/smallProstate.obj" />
-  <arg name="secondary_mesh_path" default="package://oct_15_demo/resources/smallProstate.obj" />
-  <arg name="texture_path" default="package://oct_15_demo/resources/smallProstate.png"/>
   <arg name="scale" default="1.0526" />
+  <arg name="inlier_ratio" default=".8"/> 
+
+  <!--<arg name="mesh_path" default="package://dvrk_vision/defaults/bunny.obj" />
+  <arg name="secondary_mesh_path" default="package://dvrk_vision/defaults/bunny.obj" />
+  <arg name="texture_path" default="package://dvrk_vision/defaults/bunny_diffuse.png"/>
+  <arg name="scale" default=".095" /> 
+  <arg name="inlier_ratio" default="1"/> -->
+
+  <!--<arg name="mesh_path" default="package://oct_15_demo/resources/smallProstate.obj" />
+  <arg name="secondary_mesh_path" default="package://oct_15_demo/resources/smallProstateAnnotated.obj" />
+  <arg name="texture_path" default="package://oct_15_demo/resources/smallProstate.png"/>
+  <arg name="scale" default="1.0526" /> -->
 
   <include file="$(find dvrk_vision)/launch/just_cams.launch">
     <arg name="world_frame" default="PSM2_psm_base_link"/>
@@ -37,11 +46,11 @@
     <remap from="left/image_rect_color" to="left/image_rect"/>
     <remap from="right/image_rect_color" to="right/image_rect"/>
     <param name="approximate_sync" value="true" />
-  </node>
-
-  <node ns="stereo" name="main_gui" type="main_gui.py" pkg="oct_15_demo" output="screen" required="true">
+  </node>z
+  
+  <node ns="stereo" name="main_gui" type="main_gui.py" pkg="oct_15_demo" output="screen" clear_params="true" required="true">
     <param name="mesh_path" value="$(arg mesh_path)"/>
-    <param name="secondary_mesh_path" value="$(arg secondary_mesh_path)"/>
+    <param name="secondary_mesh_path" value="$(arg secondary_mesh_path)"/> 
     <param name="mesh_scale" value="$(arg scale)"/>
     <param name="texture_path" value="$(arg texture_path)"/>
   </node>
@@ -49,21 +58,10 @@
   <node ns="stereo" name="bingham_registration" type="registration_node" pkg="bingham_registration" output="screen">
     <param name="mesh_path" value="$(arg mesh_path)"/>
     <param name="mesh_scale" value="$(arg scale)"/>
+    <param name="inlier_ratio" value="$(arg inlier_ratio)"/>
     <remap from="point_cloud" to="points2"/>
   </node>
 
   <node name="force_sensor" type="force_sensor_driver.py" pkg="force_sensor_gateway" output="screen"/>
-
-	<!--   <node ns="stereo" name="registration_gui" type="registration_gui.py" pkg="dvrk_vision" output="screen">
-	<param name="mesh_path" value="$(arg path)"/>
-	<param name="mesh_scale" value="$(arg scale)"/>
-	</node> -->
-
-	<!--   <node ns="stereo" pkg="nodelet" type="nodelet" name="disparity_viewer"
-	        args="load dvrk_vision/disparity standalone_nodelet" output="screen">
-	    <param name="autosize" value="true" />
-	    <remap from="image" to="disparity"/>
-	  </node> -->
-
-	<!--   <node ns="stereo" name="stereo_processing" type="stereo_processing.py" pkg="dvrk_vision" output="screen"/> -->
+  
 </launch>
