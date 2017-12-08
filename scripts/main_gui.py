@@ -6,16 +6,16 @@ import rospy
 import rospkg
 
 from PyQt5 import QtWidgets, QtGui, uic, QtCore
-import dvrk_vision
 import bingham_registration
 from dvrk_vision.registration_gui import RegistrationWidget
 from roi_widget import ROIWidget
 from overlay_gui import OverlayWidget
 import dvrk_vision.vtktools as vtktools
+from dvrk_vision.vtk_stereo_viewer import StereoCameras
 
 class MainWindow(QtWidgets.QMainWindow):
 
-    def __init__(self, parentWindow = None):
+    def __init__(self, camera, masterWidget = None):
 
         super(MainWindow, self).__init__()
 
@@ -32,38 +32,47 @@ class MainWindow(QtWidgets.QMainWindow):
         stlScale = rospy.get_param("~mesh_scale")
 
         # Set up parents
-        regParent = None if parentWindow == None else parentWindow.reg
-        overlayParent = None if parentWindow == None else parentWindow.overlay
-        roiParent = None if parentWindow == None else parentWindow.roi
+        regParent = None if masterWidget == None else masterWidget.reg
+        # overlayParent = None if masterWidget == None else masterWidget.overlay
+        roiParent = None if masterWidget == None else masterWidget.roi
 
-        self.reg = RegistrationWidget(meshPath,
+        self.reg = RegistrationWidget(camera,
+                                      meshPath,
                                       scale=stlScale,
-                                      parentWindow = regParent)
+                                      masterWidget = regParent,
+                                      parent = self)
         self.regLayout = QtWidgets.QVBoxLayout()
         self.regLayout.addWidget(self.reg)
         self.tabRegistration.setLayout(self.regLayout)
 
-        self.overlay = OverlayWidget(secondaryMeshPath,
-                                     scale=stlScale,
-                                     parentWindow = overlayParent)
-        self.overlayLayout = QtWidgets.QVBoxLayout()
-        self.overlayLayout.addWidget(self.overlay)
-        self.tabOverlay.setLayout(self.overlayLayout)
+        # if regParent == None:
+        #     self.overlay = OverlayWidget(secondaryMeshPath,
+        #                                  scale=stlScale,
+        #                                  masterWidget = overlayParent)
 
-        if parentWindow == None:
-            texturePath = rospy.get_param("~texture_path")
-            self.roi = ROIWidget('/stiffness_map',
-                                 texturePath,
-                                 parentWindow = roiParent)
-            self.roiLayout = QtWidgets.QVBoxLayout()
-            self.roiLayout.addWidget(self.roi)
-            self.tabROI.setLayout(self.roiLayout)
+        # else:
+        #     self.overlay = OverlayWidget(secondaryMeshPath,
+        #                                  scale=stlScale,
+        #                                  masterWidget = overlayParent)
+
+        # self.overlayLayout = QtWidgets.QVBoxLayout()
+        # self.overlayLayout.addWidget(self.overlay)
+        # self.tabOverlay.setLayout(self.overlayLayout)
+
+        texturePath = rospy.get_param("~texture_path")
+        self.roi = ROIWidget('/stiffness_map',
+                             texturePath,
+                             masterWidget = roiParent,
+                             parent = self)
+        self.roiLayout = QtWidgets.QVBoxLayout()
+        self.roiLayout.addWidget(self.roi)
+        self.tabROI.setLayout(self.roiLayout)
         
 
         self.otherWindows = []
-        if parentWindow != None:
-            parentWindow.otherWindows.append(self)
-            self.otherWindows.append(parentWindow)
+        if masterWidget != None:
+            masterWidget.otherWindows.append(self)
+            self.otherWindows.append(masterWidget)
 
         self.tabWidget.currentChanged.connect(self.tabChanged)
 
@@ -82,7 +91,14 @@ class MainWindow(QtWidgets.QMainWindow):
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     rosThread = vtktools.RosQThread()
-    mainWin = MainWindow()
-    secondWin = MainWindow(mainWin)
+    frameRate = 15
+    slop = 1.0 / frameRate
+    cams = StereoCameras("left/image_rect",
+                      "right/image_rect",
+                      "left/camera_info",
+                      "right/camera_info",
+                      slop = slop)
+    mainWin = MainWindow(cams.camL)
+    secondWin = MainWindow(cams.camR, masterWidget = mainWin)
     rosThread.start()
     sys.exit(app.exec_())

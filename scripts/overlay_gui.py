@@ -106,7 +106,7 @@ def cleanResourcePath(path):
 
 class OverlayWidget(QWidget):
 
-    def __init__(self, meshPath, scale=1, namespace="/stereo", parentWindow=None):
+    def __init__(self, meshPath, scale=1, namespace="/stereo", vtkThread=None, parentWidget=None):
 
         super(OverlayWidget, self).__init__()
         uiPath = cleanResourcePath("package://oct_15_demo/scripts/overlay_widget.ui")
@@ -114,13 +114,13 @@ class OverlayWidget(QWidget):
         uic.loadUi(uiPath, self)
 
         # Check whether this is the left (primary) or the right (secondary) window
-        self.isPrimaryWindow = parentWindow == None
+        self.isPrimaryWindow = parentWidget == None
         side = "left" if self.isPrimaryWindow else "right"
 
         self.otherWindows = []
         if not self.isPrimaryWindow:
-            parentWindow.otherWindows.append(self)
-            self.otherWindows.append(parentWindow) 
+            parentWidget.otherWindows.append(self)
+            self.otherWindows.append(parentWidget) 
 
         # Set up subscriber for camera image
         self.bridge = CvBridge()
@@ -192,6 +192,9 @@ class OverlayWidget(QWidget):
         self.iren.RemoveObservers('MiddleButtonPressEvent')
         self.iren.RemoveObservers('MiddleButtonPressEvent')
 
+        if vtkThread != None:
+            vtkThread.addRenWin(self.renWin)
+
         # Set up QT slider for opacity
         self.opacitySlider.valueChanged.connect(self.sliderChanged) 
         self.textureCheckBox.stateChanged.connect(self.checkBoxChanged)
@@ -214,7 +217,7 @@ class OverlayWidget(QWidget):
         try:
             image = self.bridge.imgmsg_to_cv2(data, "bgr8")
             vtktools.numpyToVtkImage(image,self.bgImage)
-            self.renWin.Render()
+            # self.renWin.Render()
         except:
             rospy.logwarn("Overlay GUI: Error in image callback")
             pass
@@ -257,6 +260,6 @@ if __name__ == "__main__":
     meshPath = rospy.get_param("~mesh_path")
     stlScale = rospy.get_param("~mesh_scale")
     windowL = RegistrationWindow(meshPath, scale=stlScale)
-    windowR = RegistrationWindow(meshPath, scale=stlScale, parentWindow=windowL)
+    windowR = RegistrationWindow(meshPath, scale=stlScale, parentWidget=windowL)
     rosThread.start()
     sys.exit(app.exec_())
