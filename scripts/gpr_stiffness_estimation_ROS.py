@@ -78,15 +78,15 @@ class gpr_palpation():
         self.algorithm_class = self.chooseAlgorithm(algorithm_name)
 
         # ROS 
-        self.pub = rospy.Publisher('/stiffness_map', Image, queue_size=10)        
-        self.sub = rospy.Subscriber('/get_stiffness', Bool,self.searchingCB)
+        self.pub = rospy.Publisher('/stereo/stiffness_map', Image, queue_size=10)        
+        self.sub = rospy.Subscriber('/stereo/get_stiffness', Bool,self.searchingCB)
 
         self.rate = rospy.Rate(1000)
         self.visualize = visualize
 
         if not simulation:
-            rospy.wait_for_service('probe2D')
-            self.probe2D = rospy.ServiceProxy('probe2D', oct_15_demo.srv.Probe2D)
+            rospy.wait_for_service('/stereo/probe2D')
+            self.probe2D = rospy.ServiceProxy('/stereo/probe2D', oct_15_demo.srv.Probe2D)
 
         # self.ind = np.random.randint(0,self.domain['L1'])
         self.ind = 5050
