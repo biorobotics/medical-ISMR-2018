@@ -33,7 +33,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Set up parents
         regParent = None if masterWidget == None else masterWidget.reg
-        # overlayParent = None if masterWidget == None else masterWidget.overlay
+        overlayParent = None if masterWidget == None else masterWidget.overlay
         roiParent = None if masterWidget == None else masterWidget.roi
 
         self.reg = RegistrationWidget(camera,
@@ -45,22 +45,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.regLayout.addWidget(self.reg)
         self.tabRegistration.setLayout(self.regLayout)
 
-        # if regParent == None:
-        #     self.overlay = OverlayWidget(secondaryMeshPath,
-        #                                  scale=stlScale,
-        #                                  masterWidget = overlayParent)
-
-        # else:
-        #     self.overlay = OverlayWidget(secondaryMeshPath,
-        #                                  scale=stlScale,
-        #                                  masterWidget = overlayParent)
-
-        # self.overlayLayout = QtWidgets.QVBoxLayout()
-        # self.overlayLayout.addWidget(self.overlay)
-        # self.tabOverlay.setLayout(self.overlayLayout)
-
         texturePath = rospy.get_param("~texture_path")
-        self.roi = ROIWidget('/stiffness_map',
+        self.roi = ROIWidget("stiffness_map",
                              texturePath,
                              masterWidget = roiParent,
                              parent = self)
@@ -68,6 +54,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.roiLayout.addWidget(self.roi)
         self.tabROI.setLayout(self.roiLayout)
         
+        self.overlay = OverlayWidget(camera,
+                                     texturePath,
+                                     secondaryMeshPath,
+                                     scale=stlScale,
+                                     masterWidget = overlayParent,
+                                     parent = self)
+        self.overlayLayout = QtWidgets.QVBoxLayout()
+        self.overlayLayout.addWidget(self.overlay)
+        self.tabOverlay.setLayout(self.overlayLayout)
 
         self.otherWindows = []
         if masterWidget != None:
@@ -75,7 +70,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.otherWindows.append(masterWidget)
 
         self.tabWidget.currentChanged.connect(self.tabChanged)
-
         self.show()
 
     def tabChanged(self):
@@ -90,7 +84,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
-    rosThread = vtktools.RosQThread()
+    rosThread = vtktools.QRosThread()
+    rosThread.start()
     frameRate = 15
     slop = 1.0 / frameRate
     cams = StereoCameras("left/image_rect",
@@ -100,5 +95,4 @@ if __name__ == "__main__":
                       slop = slop)
     mainWin = MainWindow(cams.camL)
     secondWin = MainWindow(cams.camR, masterWidget = mainWin)
-    rosThread.start()
     sys.exit(app.exec_())
