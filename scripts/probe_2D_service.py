@@ -140,15 +140,15 @@ class Probe2DServer():
                                          ForceSensorData, self.forceCb)
         # self.forceSub = rospy.Subscriber('/dvrk/PSM2/wrench_body_current',
         #                                  WrenchStamped, self.forceCb)
-        self.organPoseSub = rospy.Subscriber('/stereo/registration_pose',
+        self.organPoseSub = rospy.Subscriber('registration_pose',
                                              PoseStamped, self.poseCb)
-        self.roiSub = rospy.Subscriber('/stiffness_roi',
+        self.roiSub = rospy.Subscriber('stiffness_roi',
                                         RegionOfInterest, self.roiCb)
         self.cameraTransform = cameraTransform
         self.organTransform = None
         self.robot = psm('PSM2')
 
-        self.toolOffset = .025 # distance from pinching axle to center of orange nub
+        self.toolOffset = .02 # distance from pinching axle to center of orange nub
 
         rate = 1000.0
         # TODO make these values not hard coded
@@ -169,7 +169,7 @@ class Probe2DServer():
         }
 
         # TODO make these not hard-coded
-        self.maxDepth = 0.0025 # Meters
+        self.maxDepth = 0.007 # Meters
         self.maxForce = 800 # Not sure of this?
         self.safeZ = .05 # Safe height above organ in meters
         self.normalDistance = 0.005 # Meters
@@ -260,8 +260,8 @@ class Probe2DServer():
             else:
                 self.move(pose, self.maxForce)
 
-        np.save(os.path.join(functionPath,"force.data"),forceData)
-        np.save(os.path.join(functionPath,"displacement.data"),displacements)
+        # np.save(os.path.join(functionPath,"force.data"),forceData)
+        # np.save(os.path.join(functionPath,"displacement.data"),displacements)
         return displacements, forceData
 
     def makeTrajectory(self, position, normal):
