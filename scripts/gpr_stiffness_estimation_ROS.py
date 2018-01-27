@@ -308,7 +308,8 @@ class gpr_palpation():
 
 if __name__ == "__main__":
     rospy.init_node('gpr_python', anonymous=True)
-    gpr = gpr_palpation(algorithm_name='UCB', visualize=True, simulation=False, wait_for_searching_signal = True) # 'LSE', 'EI', 'UCB' 
+    
+    gpr = gpr_palpation(algorithm_name='UCB', visualize=True, simulation=False, wait_for_searching_signal = True) # 'LSE', 'EI', 'UCB'
 
     # visualize ground truth
     ##gpr.visualize_map(map=gpr.groundTruth,title='Ground Truth', figure=1)
