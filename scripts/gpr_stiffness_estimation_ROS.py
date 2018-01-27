@@ -32,18 +32,21 @@ class EI(aquisition_algorithm):
             self.stiffnessCollected=stiffnessCollected
 
         def aquisitionFunciton(self):
-            eps = 0.01
+            eps = 0.1
             ymu = self.estimated_map['mean']
             ys2 = self.estimated_map['variance']
 
-            ys=np.atleast_2d(np.sqrt(ys2)).T;
-            yEI=np.max(self.stiffnessCollected)
-            
-            temp=np.max(ymu)
-            ymu=ymu/temp
-            yEI=yEI/temp
+            minStiffnessCollected = np.min(self.stiffnessCollected)
 
+            ys=np.atleast_2d(np.sqrt(ys2)).T;
+            yEI=np.max(self.stiffnessCollected) - minStiffnessCollected
+
+            ymuMax=np.max(ymu)
+            ymu=ymu/ymuMax
+            yEI=yEI/ymuMax
+            ind_zero = (ys<=0.01)
             aquisitionFunciton = (ymu-yEI-eps)*norm.cdf((ymu-yEI-eps)/ys) + ys*norm.pdf((ymu-yEI-eps)/ys);
+            aquisitionFunciton[ind_zero]=0;
             aquisitionFunciton/=np.sum(aquisitionFunciton)
             return aquisitionFunciton
 
@@ -56,15 +59,49 @@ class UCB(aquisition_algorithm):
         beta=1.35
         ymu = self.estimated_map['mean']
         ys2 = self.estimated_map['variance']
+        ymu=ymu/np.max(ymu)
 
         ys=np.atleast_2d(np.sqrt(ys2)).T;
-        aquisitionFunciton = ymu/np.max(ymu) + beta*ys;
+        aquisitionFunciton = ymu + beta*ys;
         aquisitionFunciton/=np.sum(aquisitionFunciton)
         return aquisitionFunciton
 
+class LSE(aquisition_algorithm):
+    """docstring for LSE"""
+    def __init__(self, estimated_map,_):
+        super(LSE, self).__init__(estimated_map)
+        self.C = None
+        self.a = None #ambiguity 
+        self.h = .8
+        self.beta=1.35
+
+    def aquisitionFunciton(self):
+        ymu = self.estimated_map['mean']
+        ymuMax=np.max(ymu)
+        if ymuMax != 0:
+            ymu=ymu/ymuMax
+        
+        self.h=0.4
+        ys2 = self.estimated_map['variance']
+        ys=np.atleast_2d(np.sqrt(ys2)).T;
+
+        Q_min = ymu - self.beta*ys;
+        Q_max = ymu + self.beta*ys;
+        
+        if self.C is None:
+            self.C = {'min':Q_min,'max':Q_max} 
+        else:
+            self.C['min']=np.max(np.array([Q_min,self.C['min']]),axis = 0)
+            self.C['max']=np.min(np.array([Q_max,self.C['max']]),axis = 0)
+
+        temp1=self.C['max']-self.h*np.ones(self.C['max'].shape)
+        temp2=self.h*np.ones(self.C['max'].shape)-self.C['min']
+        self.a=np.min(np.array([temp1.T[0],temp2.T[0]]),axis=0)
+        return self.a
+
 class gpr_palpation():
-    def __init__(self, algorithm_name, visualize=True,  simulation=True):
-        self.searching = False
+    def __init__(self, algorithm_name, visualize=True,  simulation=True, wait_for_searching_signal = True):
+        self.searching = not wait_for_searching_signal
         self.simulation = simulation
         self.domain = {'L1':100, 'L2':100}
         self.grid = self.generateGrid()
@@ -89,12 +126,12 @@ class gpr_palpation():
             self.probe2D = rospy.ServiceProxy('/stereo/probe2D', oct_15_demo.srv.Probe2D)
 
         # self.ind = np.random.randint(0,self.domain['L1'])
-        self.ind = 5050
+        self.ind = 7050
 
     def searchingCB(self, msg):
         if msg.data and not self.searching:
             # self.ind = np.random.randint(0,self.domain['L1'])
-            self.ind = 5050
+            self.ind = 7050
             self.estimated_map['mean'] = None
             self.estimated_map['variance'] = None
             self.probedPoints[:] = [] # saves all the probed points so far
@@ -107,6 +144,8 @@ class gpr_palpation():
             return EI(self.estimated_map,self.stiffnessCollected)
         if algorithm_name == 'UCB':
             return UCB(self.estimated_map,self.stiffnessCollected)
+        if algorithm_name == 'LSE':
+            return LSE(self.estimated_map,None)
 
     def gp_init(self):
         kernel = C(1.0, (1e-3, 1e3))*RBF(8, (1e-2, 1e2))
@@ -167,7 +206,6 @@ class gpr_palpation():
         im = PIL.Image.fromarray(np.uint8(cm.hot(map)*255))
         cv_im=np.array(im)
         # cv_im = cv2.flip(cv_im,0)
-        # embed()
 
         msg_frame = CvBridge().cv2_to_imgmsg(cv_im,'rgba8')
         self.pub.publish(msg_frame)
@@ -196,10 +234,7 @@ class gpr_palpation():
         if self.simulation:         
         #evaluate the stiffness at that point
             yind = self.evaluateStiffness(X_query=x_probed)
-            # if self.min > yind:
-            #     self.min = yind
-            #     # print 'HEY'
-            # yind = yind - self.min
+
         else:
             point = oct_15_demo.srv.Probe2DRequest()
             x_probed = x_probed/self.domain['L1']
@@ -211,7 +246,6 @@ class gpr_palpation():
                 self.probedPoints = self.probedPoints[:len(self.probedPoints)-1]
                 return
             yind = np.array([yind.Stiffness])
-        # embed()
 
         self.stiffnessCollected.append(yind.tolist())
         probedPoints_array = np.asarray(self.probedPoints)
@@ -232,19 +266,20 @@ class gpr_palpation():
         self.aquisitionFunciton = alg.aquisitionFunciton()
         indices = sorted(range(len(self.aquisitionFunciton)),reverse=True, key=lambda x: self.aquisitionFunciton[x])
         found_safe_point = False
-        i=0
-        while not found_safe_point:
-            ind = indices[i]
-            x_probe = self.grid[ind,:]
-            dx = x_probe[0] - self.domain['L1']/2
-            dy = x_probe[1] - self.domain['L1']/2
-            r_squared = dx*dx+dy*dy
-            safety = 10 # some safety region away from boundary
-            r_max = self.domain['L1']/2 - safety ## maximum allowed radius of the region to palpate in
-            if r_squared < r_max*r_max: 
-                found_safe_point = True
-            i=i+1
         
+        # i=0
+        # while not found_safe_point:
+        #     ind = indices[i]
+        #     x_probe = self.grid[ind,:]
+        #     dx = x_probe[0] - self.domain['L1']/2
+        #     dy = x_probe[1] - self.domain['L1']/2
+        #     r_squared = dx*dx+dy*dy
+        #     safety = 10 # some safety region away from boundary
+        #     r_max = self.domain['L1']/2 - safety ## maximum allowed radius of the region to palpate in
+        #     if r_squared < r_max*r_max: 
+        #         found_safe_point = True
+        #     i=i+1
+        ind = indices[0]
         return ind
     
     def autoPalpation(self, num_of_probes=-1):
@@ -272,7 +307,7 @@ class gpr_palpation():
 
 if __name__ == "__main__":
     rospy.init_node('gpr_python', anonymous=True)
-    gpr = gpr_palpation(algorithm_name='UCB', visualize=False, simulation=False) #or 'UCB' for now
+    gpr = gpr_palpation(algorithm_name='UCB', visualize=True, simulation=True, wait_for_searching_signal = False) # 'LSE', 'EI', 'UCB' 
 
     # visualize ground truth
     gpr.visualize_map(map=gpr.groundTruth,title='Ground Truth', figure=1)
