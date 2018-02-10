@@ -57,7 +57,7 @@ class UCB(aquisition_algorithm):
         super(UCB, self).__init__(estimated_map)
 
     def aquisitionFunciton(self):
-        beta=1.35
+        beta=4.35
         ymu = self.estimated_map['mean']
         ys2 = self.estimated_map['variance']
         ymu=ymu/np.max(ymu)
@@ -72,7 +72,7 @@ class LSE(aquisition_algorithm):
     def __init__(self, estimated_map,_):
         super(LSE, self).__init__(estimated_map)
         self.C = None
-        self.a = None #ambiguity 
+        self.a = None #ambiguity
         self.h = .8
         self.beta=1.35
 
@@ -81,16 +81,16 @@ class LSE(aquisition_algorithm):
         ymuMax=np.max(ymu)
         if ymuMax != 0:
             ymu=ymu/ymuMax
-        
-        self.h=0.4
+       
+        self.h=0.6
         ys2 = self.estimated_map['variance']
         ys=np.atleast_2d(np.sqrt(ys2)).T;
 
         Q_min = ymu - self.beta*ys;
         Q_max = ymu + self.beta*ys;
-        
+       
         if self.C is None:
-            self.C = {'min':Q_min,'max':Q_max} 
+            self.C = {'min':Q_min,'max':Q_max}
         else:
             self.C['min']=np.max(np.array([Q_min,self.C['min']]),axis = 0)
             self.C['max']=np.min(np.array([Q_max,self.C['max']]),axis = 0)
@@ -108,15 +108,15 @@ class gpr_palpation():
         self.grid = self.generateGrid()
         self.groundTruth = self.generateStiffnessMap()
         self.gp = self.gp_init()
-        
+       
         self.estimated_map={'mean':None,'variance':None}
         self.probedPoints=[] # saves all the probed points so far
         self.stiffnessCollected=[] # saves all the probed stiffnesses
-        
+       
         self.algorithm_class = self.chooseAlgorithm(algorithm_name)
 
-        # ROS 
-        self.pub = rospy.Publisher('/stereo/stiffness_map', Image, queue_size=10)        
+        # ROS
+        self.pub = rospy.Publisher('/stereo/stiffness_map', Image, queue_size=10)       
         self.sub = rospy.Subscriber('/stereo/get_stiffness', Bool,self.searchingCB)
 
         self.rate = rospy.Rate(1000)
@@ -138,7 +138,7 @@ class gpr_palpation():
             self.probedPoints[:] = [] # saves all the probed points so far
             self.stiffnessCollected[:] = [] # saves all the probed stiffnesses
         self.searching = msg.data
-        
+       
 
     def chooseAlgorithm(self, algorithm_name):
         if algorithm_name == 'EI':
@@ -149,7 +149,7 @@ class gpr_palpation():
             return LSE(self.estimated_map,None)
 
     def gp_init(self):
-        kernel = C(1.0, (1e-3, 1e3))*RBF(8, (1e-2, 1e2))
+        kernel = C(1.0, (1e-3, 1e3))*RBF(10, (1e-2, 1e2))
         gp = GaussianProcessRegressor(kernel=kernel, optimizer=None, n_restarts_optimizer=9)
         return gp
 
@@ -210,7 +210,7 @@ class gpr_palpation():
 
         msg_frame = CvBridge().cv2_to_imgmsg(cv_im,'rgba8')
         self.pub.publish(msg_frame)
-        
+       
         if self.visualize:
             plt.figure(figure)
             plt.clf()
@@ -226,13 +226,13 @@ class gpr_palpation():
             plt.pause(0.01)
 
         return msg_frame
-        
+       
     def evaluateStiffness(self, X_query):
         return griddata( self.grid, self.groundTruth, X_query)
 
     def probe(self, x_probed):
         self.probedPoints.append(x_probed.tolist())
-        if self.simulation:         
+        if self.simulation:        
         #evaluate the stiffness at that point
             yind = self.evaluateStiffness(X_query=x_probed)
 
@@ -256,7 +256,7 @@ class gpr_palpation():
         self.gp.fit(probedPoints_array, stiffnessCollected_array)
         self.estimated_map['mean'], self.estimated_map['variance'] = self.gp.predict(self.grid, return_std=True)
         self.estimated_map['mean'][self.estimated_map['mean']<0]=0
-        
+       
         # shows the animation of the stiffness estimation
         self.visualize_map(title='Estimated map', figure=2, map=self.estimated_map['mean'], probed_points=probedPoints_array)
 
@@ -267,7 +267,7 @@ class gpr_palpation():
         self.aquisitionFunciton = alg.aquisitionFunciton()
         indices = sorted(range(len(self.aquisitionFunciton)),reverse=True, key=lambda x: self.aquisitionFunciton[x])
         found_safe_point = False
-        
+       
         # i=0
         # while not found_safe_point:
         #     ind = indices[i]
@@ -277,12 +277,12 @@ class gpr_palpation():
         #     r_squared = dx*dx+dy*dy
         #     safety = 10 # some safety region away from boundary
         #     r_max = self.domain['L1']/2 - safety ## maximum allowed radius of the region to palpate in
-        #     if r_squared < r_max*r_max: 
+        #     if r_squared < r_max*r_max:
         #         found_safe_point = True
         #     i=i+1
         ind = indices[0]
         return ind
-    
+   
     def autoPalpation(self, num_of_probes=-1):
 
         if num_of_probes == -1:
@@ -308,8 +308,7 @@ class gpr_palpation():
 
 if __name__ == "__main__":
     rospy.init_node('gpr_python', anonymous=True)
-    
-    gpr = gpr_palpation(algorithm_name='UCB', visualize=True, simulation=False, wait_for_searching_signal = True) # 'LSE', 'EI', 'UCB'
+    gpr = gpr_palpation(algorithm_name='UCB', visualize=False, simulation=False, wait_for_searching_signal = True) # 'LSE', 'EI', 'UCB'
 
     # visualize ground truth
     ##gpr.visualize_map(map=gpr.groundTruth,title='Ground Truth', figure=1)
