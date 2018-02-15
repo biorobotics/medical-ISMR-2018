@@ -4,17 +4,17 @@
   <arg name="texture_path" default="package://oct_15_demo/resources/DiffuseHills.png"/>
   <arg name="inlier_ratio" default=".8"/> -->
 
-  <arg name="mesh_path" default="package://oct_15_demo/resources/SquareOrgan.obj" />
+  <!-- <arg name="mesh_path" default="package://oct_15_demo/resources/SquareOrgan.obj" /> -->
 <!--   <arg name="secondary_mesh_path" default="package://oct_15_demo/resources/HillOrganAnnotated.obj" /> -->
-  <arg name="texture_path" default="package://oct_15_demo/resources/DiffuseHills.png"/>
+<!--   <arg name="texture_path" default="package://oct_15_demo/resources/DiffuseHills.png"/>
   <arg name="scale" default=".98"/>
-  <arg name="inlier_ratio" default=".66"/>
+  <arg name="inlier_ratio" default=".9"/> -->
 
-<!--   <arg name="mesh_path" default="package://oct_15_demo/resources/largeProstate.obj" />
+  <arg name="mesh_path" default="package://oct_15_demo/resources/largeProstate.obj" />
   <arg name="secondary_mesh_path" default="package://oct_15_demo/resources/largeProstateAnnotated.obj" />
   <arg name="texture_path" default="package://oct_15_demo/resources/largeProstate.png"/>
-  <arg name="scale" default="1.06" />
-  <arg name="inlier_ratio" default=".8"/>  -->
+  <arg name="scale" default="1.08" />
+  <arg name="inlier_ratio" default=".8"/> 
 
   <!--<arg name="mesh_path" default="package://dvrk_vision/defaults/bunny.obj" />
   <arg name="secondary_mesh_path" default="package://dvrk_vision/defaults/bunny.obj" />
@@ -30,12 +30,13 @@
   <include file="$(find dvrk_vision)/launch/just_cams.launch">
     <arg name="world_frame" default="PSM2_psm_base_link"/>
     <arg name="transform_yaml" default="package://dvrk_vision/defaults/registration_params.yaml"/>
+    <arg name="skip_frames" default="2"/>
   </include>
 
   <node ns="stereo" pkg="nodelet" type="nodelet" name="disparity"
         args="load stereo_image_proc/disparity standalone_nodelet"
         output="screen">
-    <param name="queue_size" value="5" />
+    <param name="queue_size" value="3" />
     <param name="approximate_sync" value="true" />
   </node>
 
@@ -43,7 +44,7 @@
 
   <node ns="stereo" pkg="nodelet" type="nodelet" name="point_cloud"
         args="load dvrk_vision/point_cloud2 standalone_nodelet">
-    <param name="queue_size" value="5" />
+    <param name="queue_size" value="3" />
     <remap from="left/image_rect_color" to="left/image_rect"/>
     <remap from="right/image_rect_color" to="right/image_rect"/>
     <param name="approximate_sync" value="true" />
