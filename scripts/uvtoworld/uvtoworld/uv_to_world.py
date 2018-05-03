@@ -134,7 +134,7 @@ class CleanTexturedPolyData(vtk.vtkProgrammableFilter):
 		self.normalGenerator.Update()
 		self.GetPolyDataOutput().ShallowCopy(self.normalGenerator.GetOutput())
 
-def makeTexturedObjData(objPath):
+def makeTexturedObjData(objPath, scale=1):
 	""" Loads .obj into VTK polyData optimized for searching texture space. 
 	
 	Args:
@@ -154,7 +154,13 @@ def makeTexturedObjData(objPath):
 	else:
 		cleanFilter.SetInputConnection(meshReader.GetOutputPort())
 	cleanFilter.Update()
-	polyData = cleanFilter.GetOutput()
+	transform = vtk.vtkTransform()
+	transform.Scale(scale,scale,scale)
+	transformFilter=vtk.vtkTransformPolyDataFilter()
+	transformFilter.SetTransform(transform)
+	transformFilter.SetInputConnection(cleanFilter.GetOutputPort())
+	transformFilter.Update()
+	polyData = transformFilter.GetOutput()
 	return polyData
 
 def pointToBarycentric(p, a, b, c):

@@ -73,16 +73,15 @@ class LSE(aquisition_algorithm):
         super(LSE, self).__init__(estimated_map)
         self.C = None
         self.a = None #ambiguity
-        self.h = .8
-        self.beta=1.35
+        self.h = 0.8
+        self.beta= 2
 
     def aquisitionFunciton(self):
         ymu = self.estimated_map['mean']
         ymuMax=np.max(ymu)
         if ymuMax != 0:
             ymu=ymu/ymuMax
-       
-        self.h=0.6
+
         ys2 = self.estimated_map['variance']
         ys=np.atleast_2d(np.sqrt(ys2)).T;
 
@@ -149,8 +148,8 @@ class gpr_palpation():
             return LSE(self.estimated_map,None)
 
     def gp_init(self):
-        kernel = C(1.0, (1e-3, 1e3))*RBF(10, (1e-2, 1e2))
-        gp = GaussianProcessRegressor(kernel=kernel, optimizer=None, n_restarts_optimizer=9)
+        kernel = C(1.0, (1, 1))*RBF(20, (8, 20))
+        gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9)
         return gp
 
     def generateGrid(self,res=1):
@@ -214,13 +213,13 @@ class gpr_palpation():
         if self.visualize:
             plt.figure(figure)
             plt.clf()
-            fig=plt.imshow(normalized_map,origin='lower',cmap=cm.hot)
+            fig=plt.imshow(normalized_map, origin='lower',cmap=cm.hot)
             plt.title(title)
             plt.colorbar()
             if not (probed_points is None):
                 plt.scatter(probed_points[:,0],probed_points[:,1])
-            plt.xlim((0,100))
-            plt.ylim((0,100))
+            # plt.xlim((0,100))
+            # plt.ylim((0,100))
             # plt.tight_layout()
             # plt.show()
             plt.pause(0.01)
@@ -268,19 +267,21 @@ class gpr_palpation():
         indices = sorted(range(len(self.aquisitionFunciton)),reverse=True, key=lambda x: self.aquisitionFunciton[x])
         found_safe_point = False
        
-        # i=0
-        # while not found_safe_point:
-        #     ind = indices[i]
-        #     x_probe = self.grid[ind,:]
-        #     dx = x_probe[0] - self.domain['L1']/2
-        #     dy = x_probe[1] - self.domain['L1']/2
-        #     r_squared = dx*dx+dy*dy
-        #     safety = 10 # some safety region away from boundary
-        #     r_max = self.domain['L1']/2 - safety ## maximum allowed radius of the region to palpate in
-        #     if r_squared < r_max*r_max:
-        #         found_safe_point = True
-        #     i=i+1
-        ind = indices[0]
+        i=0
+        while not found_safe_point:
+            ind = indices[i]
+            x_probe = self.grid[ind,:]
+            dx = x_probe[0] - self.domain['L1']/2
+            dy = x_probe[1] - self.domain['L1']/2
+            r_squared = dx*dx+dy*dy
+            safety = 0.01 # some safety region away from boundary
+            r_max = self.domain['L1']/2 * (1 - safety) ## maximum allowed radius of the region to palpate in
+            ## maximum allowed radius of the region to palpate in
+            if r_squared < r_max*r_max:
+                found_safe_point = True
+                break
+            i=i+1
+        # ind = indices[i]
         return ind
    
     def autoPalpation(self, num_of_probes=-1):
@@ -308,10 +309,11 @@ class gpr_palpation():
 
 if __name__ == "__main__":
     rospy.init_node('gpr_python', anonymous=True)
-    gpr = gpr_palpation(algorithm_name='UCB', visualize=False, simulation=False, wait_for_searching_signal = True) # 'LSE', 'EI', 'UCB'
+    gpr = gpr_palpation(algorithm_name='LSE', visualize=True, simulation=False, wait_for_searching_signal = True) # 'LSE', 'EI', 'UCB'
 
     # visualize ground truth
     ##gpr.visualize_map(map=gpr.groundTruth,title='Ground Truth', figure=1)
 
     gpr.autoPalpation()
+    embed()
 # plt.show()

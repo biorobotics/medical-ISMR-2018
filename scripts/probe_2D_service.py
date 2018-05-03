@@ -10,7 +10,7 @@ import numpy as np
 from uvtoworld import makeTexturedObjData
 from uvtoworld import UVToWorldConverter
 from tf_conversions import posemath
-from clean_resource_path import cleanResourcePath
+from dvrk_vision.clean_resource_path import cleanResourcePath
 import force_sensor_gateway.ransac as ransac
 from IPython import embed
 from sensor_msgs.msg import RegionOfInterest
@@ -133,11 +133,13 @@ def rotationFromVector(vectorDesired):
     # return arrayToPyKDLRotation((A*R).tolist())
 
 class Probe2DServer():
-    def __init__(self, cameraTransform, objPath):
+    def __init__(self, cameraTransform, objPath, scale):
         s = rospy.Service('probe2D', oct_15_demo.srv.Probe2D, self.probe2D)
         # Set up subscribers
         self.forceSub = rospy.Subscriber('/force_sensor_topic',
                                          ForceSensorData, self.forceCb)
+        # self.forceSub = rospy.Subscriber('/atinetft/wrench',
+        #                                   WrenchStamped, self.forceCb)
         # self.forceSub = rospy.Subscriber('/dvrk/PSM2/wrench_body_current',
         #                                  WrenchStamped, self.forceCb)
         self.organPoseSub = rospy.Subscriber('registration_pose',
@@ -184,7 +186,7 @@ class Probe2DServer():
         self.force = None
 
         # Get obj data
-        objData = makeTexturedObjData(objPath)
+        objData = makeTexturedObjData(objPath, scale)
         self.uvToWorldConverter = UVToWorldConverter(objData)
 
         self.roi = None
@@ -205,9 +207,11 @@ class Probe2DServer():
                                         curr[5]]))
 
     def forceCb(self,data):
+        # curr = self.robot.get_current_position()
+        # norm = curr.M.UnitZ()
+        # norm = [norm.x(), norm.y(), norm.z()]
         # force = [data.wrench.force.x,data.wrench.force.y,data.wrench.force.z]
-        # f = np.linalg.norm(force)
-        # f = data.wrench.force.z
+        # f = np.dot(force, norm)
         # self.force = [f,f,f,f]
         self.force = [data.data1, data.data2, data.data3, data.data4]
 
@@ -227,7 +231,7 @@ class Probe2DServer():
         point2D[0] = point2D[0] * self.roi.width + self.roi.x_offset
         point2D[1] = point2D[1] * self.roi.height + self.roi.y_offset
         point2D = point2D / float(self.stiffness_img_size)
-        point2D[1] = 1 - point2D[1]
+        # point2D[1] = 1 - point2D[1]
         pos, norm = self.uvToWorldConverter.toWorldSpace(point2D)
         pos = PyKDL.Vector(pos[0],pos[1],pos[2])
         norm = PyKDL.Vector(norm[0],norm[1],norm[2])
@@ -240,6 +244,7 @@ class Probe2DServer():
         if type(force) == type(None):
             rospy.logwarn("No forces received. Returning negative stiffness")
             return oct_15_demo.srv.Probe2DResponse(-1)
+
         stiffness = ransac.fitForceData(force, disp)
         # try:
         #     stiffness = fitForceData(force, disp)
@@ -251,12 +256,22 @@ class Probe2DServer():
     def probe(self, position, normal):
         self.resetZRot()
         traj = self.makeTrajectory(position,normal)
+        displacements = []
+        forceData = []
+        offset = 0
         for idx, pose in enumerate(traj):
             print idx
             #TODO: Take care of data, it is not a 6xn array, but
             #instead a 1xn displacement array and 4xn force array.
-            if idx == 2:
-                displacements, forceData = self.move(pose,self.maxForce)
+            # if idx == 2:
+            #     displacements, forceData = self.move(pose,self.maxForce)
+            # else:
+            #     self.move(pose, self.maxForce)
+            if idx >= 2 and idx <= 4:
+                d, f = self.move(pose, self.maxForce)
+                displacements.extend([val + offset for val in d])
+                offset = displacements[len(displacements)-1]
+                forceData.extend(f)
             else:
                 self.move(pose, self.maxForce)
 
@@ -318,7 +333,6 @@ class Probe2DServer():
                 rospy.logwarn("Probe Service: No forces detected. Not moving and returning None")
                 return None, None
             data = np.array([self.force])
-            forceArray = np.append(forceArray, data, axis = 0)
 
             if xDotMotion.vel.Norm() <= 0.001 and xDotMotion.rot.Norm() <= 0.1:
                 break
@@ -333,9 +347,9 @@ class Probe2DServer():
             measuredPose_current = self.robot.get_current_position()
             currentDisplacement = measuredPose_current.p-measuredPose_previous.p
             # currentDisplacement =  xDotMotion.vel.Norm() * self.resolvedRatesConfig['dt']
-            currentDisplacement = currentDisplacement.Norm()
-
+            currentDisplacement = PyKDL.dot(currentDisplacement, desiredPose.M.UnitZ())
             # currentDisplacement = displacements[len(displacements)-1] + currentDisplacement
+            forceArray = np.append(forceArray, data, axis = 0)
             displacements = np.append(displacements, [currentDisplacement])
         return displacements.tolist(), forceArray.tolist()
 
@@ -349,8 +363,9 @@ if __name__=="__main__":
     # print cameraTransform.M
     rospy.init_node('probe_2D_server')
     meshPath = rospy.get_param("~mesh_path")
+    scale = rospy.get_param("~scale")
     objPath = cleanResourcePath(meshPath)
-    server = Probe2DServer(cameraTransform, objPath)
+    server = Probe2DServer(cameraTransform, objPath, scale)
     # TODO turn off embed
     embed()
     # rospy.spin()

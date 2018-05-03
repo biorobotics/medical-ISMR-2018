@@ -16,20 +16,20 @@
   <arg name="scale" default="1.08" />
   <arg name="inlier_ratio" default=".8"/> 
 
-  <!--<arg name="mesh_path" default="package://dvrk_vision/defaults/bunny.obj" />
+<!--   <arg name="mesh_path" default="package://dvrk_vision/defaults/bunny.obj" />
   <arg name="secondary_mesh_path" default="package://dvrk_vision/defaults/bunny.obj" />
   <arg name="texture_path" default="package://dvrk_vision/defaults/bunny_diffuse.png"/>
-  <arg name="scale" default=".095" /> 
-  <arg name="inlier_ratio" default="1"/> -->
+  <arg name="scale" default=".102" /> 
+  <arg name="inlier_ratio" default=".8"/>  -->
 
-  <!--<arg name="mesh_path" default="package://oct_15_demo/resources/smallProstate.obj" />
+<!--   <arg name="mesh_path" default="package://oct_15_demo/resources/smallProstate.obj" />
   <arg name="secondary_mesh_path" default="package://oct_15_demo/resources/smallProstateAnnotated.obj" />
   <arg name="texture_path" default="package://oct_15_demo/resources/smallProstate.png"/>
-  <arg name="scale" default="1.0526" /> -->
+  <arg name="scale" default="1.2" />
+  <arg name="inlier_ratio" default=".8"/> -->
 
   <include file="$(find dvrk_vision)/launch/just_cams.launch">
-    <arg name="world_frame" default="PSM2_psm_base_link"/>
-    <arg name="transform_yaml" default="package://dvrk_vision/defaults/registration_params.yaml"/>
+    <arg name="camera_parent" default="PSM2_psm_base_link"/>
     <arg name="skip_frames" default="2"/>
   </include>
 
@@ -48,14 +48,13 @@
     <remap from="left/image_rect_color" to="left/image_rect"/>
     <remap from="right/image_rect_color" to="right/image_rect"/>
     <param name="approximate_sync" value="true" />
-  </node>z
+  </node>
   
   <node ns="stereo" name="main_gui" type="main_gui.py" pkg="oct_15_demo" output="screen" clear_params="true" required="true">
     <param name="mesh_path" value="$(arg mesh_path)"/>
-    <!-- <param name="secondary_mesh_path" value="$(arg secondary_mesh_path)"/>  -->
     <param name="mesh_scale" value="$(arg scale)"/>
     <param name="texture_path" value="$(arg texture_path)"/>
-  </node>
+  </node> 
 
   <node ns="stereo" name="bingham_registration" type="registration_node" pkg="bingham_registration" output="screen">
     <param name="mesh_path" value="$(arg mesh_path)"/>

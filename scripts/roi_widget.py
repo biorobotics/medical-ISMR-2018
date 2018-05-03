@@ -1,13 +1,11 @@
-#!/usr/bin/env python
-from OpenGL.GL import *
-from OpenGL.GLU import *
 import cv2
-from PyQt5 import QtGui, QtCore, QtOpenGL, QtWidgets, uic
+from dvrk_vision.cv_widget import CvWidget
+from PyQt5 import QtGui, QtCore, QtWidgets, uic
 from sensor_msgs.msg import RegionOfInterest
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import Bool
 from cv_bridge import CvBridge, CvBridgeError
-from clean_resource_path import cleanResourcePath
+from dvrk_vision.clean_resource_path import cleanResourcePath
 import message_filters
 import rospy
 import numpy as np
@@ -26,7 +24,7 @@ class ROIWidget(QtWidgets.QWidget):
         if image.shape[0] > 512 or image.shape[1] > 512:
             height, width = min(image.shape[0], 512), min(image.shape[1], 512)
             image = cv2.resize(image, (width,height))
-        self.cvWidget = CvWidget(image, stiffnessTopic, parent=self)
+        self.cvWidget = OverlayInteractorWidget(image, stiffnessTopic, parent=self)
 
         self.m = masterWidget
         if type(self.m) != type(None):
@@ -74,6 +72,8 @@ class ROIWidget(QtWidgets.QWidget):
             try:
                 # Convert your ROS Image message to OpenCV2
                 stiffnessImg = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+                # Flip because GL buffer has zero on bottom
+                stiffnessImg = cv2.flip(stiffnessImg, flipCode = 0)
                 stiffnessImg = cv2.cvtColor(stiffnessImg, cv2.COLOR_BGR2RGB)
                 stiffnessShape = (majorAxis, minorAxis)
                 stiffnessImg = cv2.resize(stiffnessImg,
@@ -98,34 +98,36 @@ class ROIWidget(QtWidgets.QWidget):
                          stiffnessImg,
                          dst = stiffnessImg)
 
-            image[yStart:yEnd, xStart:xEnd][mask] = stiffnessImg[mask]
+
+            # image[yStart:yEnd, xStart:xEnd][mask] = stiffnessImg[mask]
+            image[yStart:yEnd, xStart:xEnd] = stiffnessImg
 
         self.cvWidget.cvImage = image
 
         msg = self.bridge.cv2_to_imgmsg(image, 'rgb8')
         self.imgPub.publish(msg)
 
-class CvWidget(QtOpenGL.QGLWidget):
+class OverlayInteractorWidget(CvWidget):
 
-    def __init__(self, image, stiffnessTopic, parent=None):
-        QtOpenGL.QGLWidget.__init__(self, parent)
-        self.cvImage = image
-        self.aspectRatio = image.shape[1] / float(image.shape[0])
-        self.size = (400, 400)
-        # Ellipse variables
-        self.center = (0,0)
-        self.majorAxis = 0
-        self.minorAxis = 0
-        self.startTimer(67)
+    def __init__(self, image, stiffnessTopic, fps=15, parent=None):
+        CvWidget.__init__(self, fps, parent);
         self.roiPub = rospy.Publisher('stiffness_roi',
                                       RegionOfInterest,
                                       queue_size=1)
         self.getStiffnessPub = rospy.Publisher('get_stiffness',
                                                Bool,
                                                queue_size=1)
+        # Ellipse variables
+        self.center = (0,0)
+        self.majorAxis = 0
+        self.minorAxis = 0
         self.overlayImgSize = 1000 # in pixels
         self.overlayImage = None
+        self.setImage(image)
         self.stiffActive = False
+
+    def stopOverlayStiffness(self):
+        self.getStiffnessPub.publish(False)
 
     def clearStiffness(self):
         self.getStiffnessPub.publish(False)
@@ -136,13 +138,6 @@ class CvWidget(QtOpenGL.QGLWidget):
         if self.majorAxis > 0 and self.minorAxis > 0:
             self.getStiffnessPub.publish(True)
             self.stiffActive = True
-
-    def stopOverlayStiffness(self):
-        self.getStiffnessPub.publish(False)
-
-    def resizeEvent(self,event):
-        QtWidgets.QWidget.resizeEvent(self,event)
-        self.size = (self.width(), self.height())
 
     def getMousePos(self, event):
         size = min(self.height(),self.width())
@@ -178,10 +173,6 @@ class CvWidget(QtOpenGL.QGLWidget):
     def mouseReleaseEvent(self, QMouseEvent):
         if self.majorAxis > 0 and self.minorAxis > 0:
             self.publish_roi()
-        
-    def timerEvent(self, event):
-        if self.isVisible():
-            self.update()
 
     def publish_roi(self):
         msg = RegionOfInterest()
@@ -191,70 +182,26 @@ class CvWidget(QtOpenGL.QGLWidget):
         msg.height = int(self.minorAxis * 2 * self.overlayImgSize)
         self.roiPub.publish(msg)
 
-    def paintGL(self):
-        if not self.isVisible():
-            return
-        img = self.cvImage
-        if type(img) == type(None):
-            return
-        # Resize image to fit screen
-        newHeight = int(self.height()*self.aspectRatio)
-        size = min(newHeight,self.width())
-        offset = ((self.width() - size) / 2,
-                  (self.height() - int(size / self.aspectRatio)) / 2)
-        width, height = (size,int(size / self.aspectRatio))
-        img = cv2.resize(img, (width, height))
+    def imageProc(self, img):
         # Draw selcetion ellipse
         if(self.majorAxis > 0 and self.minorAxis > 0):
+            width = img.shape[1]
+            height = img.shape[0]
+            thickness = (width + height) / 200
             centerX = int(self.center[0] * width)
             centerY = int((1-self.center[1]) * height)
             majorAxis = int(self.majorAxis * width * 2)
             minorAxis = int(self.minorAxis * height * 2)
             box = ((centerX, centerY),(majorAxis, minorAxis),0)
-            cv2.ellipse(img, box, color=(0,255,0), thickness=size/100)
-        # Need to flip image because GL buffer has 0 at bottom
-        img = cv2.flip(img, flipCode = 0)
-        fmt = GL_RGB
-        t = GL_UNSIGNED_BYTE
-        glViewport(offset[0],offset[1],width,height)
-        glClearColor(0.0,1.0,1.0,1.0)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT )
-        glEnable(GL_ALPHA_TEST)
-        glAlphaFunc(GL_GREATER,0)
+            cv2.ellipse(img, box, color=(0,255,0), thickness=thickness)
 
-        glPixelStorei(GL_PACK_ALIGNMENT, 1)
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-        glMatrixMode(GL_PROJECTION);
-        matrix = glGetDouble( GL_PROJECTION_MATRIX )
-        glLoadIdentity();
-        glOrtho(0.0, width, 0.0, height, -1.0, 1.0)
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix()
-        glLoadIdentity()
-        glRasterPos2i(0,0)
-        glDrawPixels(width, height, fmt, t, img)
-        glPopMatrix()
-        glFlush()
-
-    def initializeGL(self):
-
-        glClearColor(0,0,0, 1.0)
-
-        glClearDepth(1.0)              
-        glDepthFunc(GL_LESS)
-        glEnable(GL_DEPTH_TEST)
-        glShadeModel(GL_SMOOTH)
-
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()                    
-        gluPerspective(45.0,1.33,0.1, 100.0) 
-        glMatrixMode(GL_MODELVIEW)
+        return img
 
 if __name__ == '__main__':
-    app = QtWidgets.QApplication(['Yo'])  
+    app = QtWidgets.QApplication(['roi_widget'])  
     rospy.init_node('stiffness_overlay', anonymous=False)
     # texturePath = rospy.get_param("~texture_path")
-    texturePath = "package://oct_15_demo/resources/goofy-face2.png"
+    texturePath = "package://oct_15_demo/resources/Diffuse.png"
     w = ROIWidget('/stereo/left/image_rect', texturePath)
     # w = ROIWidget(None, 'stiffness_map', texturePath)
     w.show()
