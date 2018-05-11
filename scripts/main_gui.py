@@ -4,8 +4,7 @@ import os
 import numpy as np
 import rospy
 import rospkg
-
-from PyQt5 import QtWidgets, QtGui, uic, QtCore
+from PyQt5 import QtWidgets, QtGui, QtCore
 import bingham_registration
 from dvrk_vision.registration_gui import RegistrationWidget
 from roi_widget import ROIWidget
@@ -18,9 +17,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, camera, masterWidget = None):
 
         super(MainWindow, self).__init__()
-
-        functionPath = os.path.dirname(os.path.realpath(__file__))
-        uic.loadUi(os.path.join(functionPath,"main_gui.ui"), self)
+        self.tabWidget = QtWidgets.QTabWidget()
+        self.setCentralWidget(self.tabWidget)
         
         meshPath = rospy.get_param("~mesh_path")
         try:
@@ -41,18 +39,14 @@ class MainWindow(QtWidgets.QMainWindow):
                                       scale=stlScale,
                                       masterWidget = regParent,
                                       parent = self)
-        self.regLayout = QtWidgets.QVBoxLayout()
-        self.regLayout.addWidget(self.reg)
-        self.tabRegistration.setLayout(self.regLayout)
+        self.tabWidget.addTab(self.reg, "Organ Registration")
 
         texturePath = rospy.get_param("~texture_path")
         self.roi = ROIWidget("stiffness_map",
                              texturePath,
                              masterWidget = roiParent,
                              parent = self)
-        self.roiLayout = QtWidgets.QVBoxLayout()
-        self.roiLayout.addWidget(self.roi)
-        self.tabROI.setLayout(self.roiLayout)
+        self.tabWidget.addTab(self.roi, "ROI Selection")
         
         self.overlay = OverlayWidget(camera,
                                      texturePath,
@@ -60,9 +54,7 @@ class MainWindow(QtWidgets.QMainWindow):
                                      scale=stlScale,
                                      masterWidget = overlayParent,
                                      parent = self)
-        self.overlayLayout = QtWidgets.QVBoxLayout()
-        self.overlayLayout.addWidget(self.overlay)
-        self.tabOverlay.setLayout(self.overlayLayout)
+        self.tabWidget.addTab(self.overlay, "Stiffness Overlay")
 
         self.otherWindows = []
         if masterWidget != None:
@@ -70,7 +62,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.otherWindows.append(masterWidget)
 
         self.tabWidget.currentChanged.connect(self.tabChanged)
-        self.show()
 
     def tabChanged(self):
         idx = self.tabWidget.currentIndex()
@@ -95,4 +86,6 @@ if __name__ == "__main__":
                       slop = slop)
     mainWin = MainWindow(cams.camL)
     secondWin = MainWindow(cams.camR, masterWidget = mainWin)
+    mainWin.show()
+    secondWin.show()
     sys.exit(app.exec_())
