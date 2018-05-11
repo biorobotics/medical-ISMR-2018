@@ -9,7 +9,7 @@ from PyQt5 import QtWidgets, QtGui, uic, QtCore
 import bingham_registration
 from dvrk_vision.registration_gui import RegistrationWidget
 from roi_widget import ROIWidget
-from overlay_gui import OverlayWidget
+from dvrk_vision.overlay_gui import OverlayWidget
 import dvrk_vision.vtktools as vtktools
 from dvrk_vision.vtk_stereo_viewer import StereoCameras
 
