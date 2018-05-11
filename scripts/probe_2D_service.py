@@ -138,8 +138,8 @@ class Probe2DServer():
         # Set up subscribers
         self.forceSub = rospy.Subscriber('/force_sensor_topic',
                                          ForceSensorData, self.forceCb)
-        # self.forceSub = rospy.Subscriber('/atinetft/wrench',
-        #                                   WrenchStamped, self.forceCb)
+        self.forceSub = rospy.Subscriber('/atinetft/wrench',
+                                          WrenchStamped, self.forceBaselineCb)
         # self.forceSub = rospy.Subscriber('/dvrk/PSM2/wrench_body_current',
         #                                  WrenchStamped, self.forceCb)
         self.organPoseSub = rospy.Subscriber('registration_pose',
@@ -184,6 +184,7 @@ class Probe2DServer():
         self.resetZRot()
         self.rate.sleep()
         self.force = None
+        self.baselineForce = None
 
         # Get obj data
         objData = makeTexturedObjData(objPath, scale)
@@ -206,13 +207,16 @@ class Probe2DServer():
                                         curr[4],
                                         curr[5]]))
 
+    def baselineForceCb(self,data):
+        curr = self.robot.get_current_position()
+        norm = curr.M.UnitZ()
+        norm = [norm.x(), norm.y(), norm.z()]
+        force = [data.wrench.force.x,data.wrench.force.y,data.wrench.force.z]
+        f = np.dot(force, norm)
+        self.baselineForce = [f,f,f,f]
+
+
     def forceCb(self,data):
-        # curr = self.robot.get_current_position()
-        # norm = curr.M.UnitZ()
-        # norm = [norm.x(), norm.y(), norm.z()]
-        # force = [data.wrench.force.x,data.wrench.force.y,data.wrench.force.z]
-        # f = np.dot(force, norm)
-        # self.force = [f,f,f,f]
         self.force = [data.data1, data.data2, data.data3, data.data4]
 
     def roiCb(self,data):
@@ -246,6 +250,7 @@ class Probe2DServer():
             return oct_15_demo.srv.Probe2DResponse(-1)
 
         stiffness = ransac.fitForceData(force, disp)
+        baselineStiffness = ransac.fitForceData(baselineForce, disp)
         # try:
         #     stiffness = fitForceData(force, disp)
         # except:
@@ -260,7 +265,9 @@ class Probe2DServer():
         forceData = []
         offset = 0
         for idx, pose in enumerate(traj):
-            print idx
+            zVec = self.robot.get_current_position().M.UnitZ() * -1
+            errorOffset = (zVec - normal) * self.toolOffset
+            pose.p = pose.p + errorOffset
             #TODO: Take care of data, it is not a 6xn array, but
             #instead a 1xn displacement array and 4xn force array.
             # if idx == 2:

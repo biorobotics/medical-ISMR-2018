@@ -73,8 +73,8 @@ class LSE(aquisition_algorithm):
         super(LSE, self).__init__(estimated_map)
         self.C = None
         self.a = None #ambiguity
-        self.h = 0.8
-        self.beta= 2
+        self.h = .8
+        self.beta=1.35
 
     def aquisitionFunciton(self):
         ymu = self.estimated_map['mean']
@@ -148,8 +148,8 @@ class gpr_palpation():
             return LSE(self.estimated_map,None)
 
     def gp_init(self):
-        kernel = C(1.0, (1, 1))*RBF(20, (8, 20))
-        gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=9)
+        kernel = C(1.0, (1e-3, 1e3))*RBF(1, (8, 20))
+        gp = GaussianProcessRegressor(kernel=kernel, optimizer='fmin_l_bfgs_b', n_restarts_optimizer=9)
         return gp
 
     def generateGrid(self,res=1):
@@ -195,7 +195,6 @@ class gpr_palpation():
     def visualize_map(self, title, figure, map=None, probed_points=None):
         if map is None:
             dense_grid=self.generateGrid(res=1)
-
             ymu = self.gp.predict(self.grid, return_std=False)
             ymu[ymu<0]=0
             map = ymu
@@ -205,7 +204,6 @@ class gpr_palpation():
 
         im = PIL.Image.fromarray(np.uint8(cm.hot(normalized_map)*255))
         cv_im=np.array(im)
-        # cv_im = cv2.flip(cv_im,0)
 
         msg_frame = CvBridge().cv2_to_imgmsg(cv_im,'rgba8')
         self.pub.publish(msg_frame)
@@ -222,6 +220,9 @@ class gpr_palpation():
             # plt.ylim((0,100))
             # plt.tight_layout()
             # plt.show()
+            filename = str(len(probed_points)).zfill(4)
+            plt.savefig(filename + '.png')
+            np.savetxt(filename + '.txt', self.estimated_map['mean'])
             plt.pause(0.01)
 
         return msg_frame
@@ -250,11 +251,12 @@ class gpr_palpation():
         self.stiffnessCollected.append(yind.tolist())
         probedPoints_array = np.asarray(self.probedPoints)
         stiffnessCollected_array = np.asarray(self.stiffnessCollected)
-        minStiffness = np.min(stiffnessCollected_array)
-        stiffnessCollected_array = stiffnessCollected_array - minStiffness
+        # minStiffness = np.min(stiffnessCollected_array)
+        # stiffnessCollected_array = stiffnessCollected_array - minStiffness
         self.gp.fit(probedPoints_array, stiffnessCollected_array)
         self.estimated_map['mean'], self.estimated_map['variance'] = self.gp.predict(self.grid, return_std=True)
-        self.estimated_map['mean'][self.estimated_map['mean']<0]=0
+        self.estimated_map['mean'] -= np.min(stiffnessCollected_array)
+        self.estimated_map['mean'][self.estimated_map['mean']<0] = 0
        
         # shows the animation of the stiffness estimation
         self.visualize_map(title='Estimated map', figure=2, map=self.estimated_map['mean'], probed_points=probedPoints_array)
