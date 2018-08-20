@@ -241,8 +241,10 @@ class gpr_palpation():
             x_probed = x_probed/self.domain['L1']
             point.Target.x, point.Target.y= (x_probed[0],x_probed[1])
             yind = self.probe2D(point)
+            if yind < 0:
+                yind = 0
             print yind
-            if yind.Stiffness < 0 or yind.Stiffness == None:
+            if yind.Stiffness == None:
                 rospy.logwarn("Got invalid stiffness. Ignoring value")
                 self.probedPoints = self.probedPoints[:len(self.probedPoints)-1]
                 return
@@ -311,7 +313,7 @@ class gpr_palpation():
 
 if __name__ == "__main__":
     rospy.init_node('gpr_python', anonymous=True)
-    gpr = gpr_palpation(algorithm_name='LSE', visualize=True, simulation=False, wait_for_searching_signal = True) # 'LSE', 'EI', 'UCB'
+    gpr = gpr_palpation(algorithm_name='LSE', visualize=False, simulation=False, wait_for_searching_signal = True) # 'LSE', 'EI', 'UCB'
 
     # visualize ground truth
     ##gpr.visualize_map(map=gpr.groundTruth,title='Ground Truth', figure=1)

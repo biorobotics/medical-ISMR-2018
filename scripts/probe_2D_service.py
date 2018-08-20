@@ -132,14 +132,14 @@ def rotationFromVector(vectorDesired):
 
     # return arrayToPyKDLRotation((A*R).tolist())
 
-class Probe2DServer():
+class Probe2DServer(object):
     def __init__(self, cameraTransform, objPath, scale):
         s = rospy.Service('probe2D', oct_15_demo.srv.Probe2D, self.probe2D)
         # Set up subscribers
-        # self.forceSub = rospy.Subscriber('/force_sensor_topic',
-        #                                  ForceSensorData, self.forceCb)
-        self.forceSub = rospy.Subscriber('/atinetft/wrench',
-                                          WrenchStamped, self.forceCb)
+        self.forceSub = rospy.Subscriber('/force_sensor_topic',
+                                         ForceSensorData, self.forceCb)
+        # self.forceSub = rospy.Subscriber('/atinetft/wrench',
+        #                                   WrenchStamped, self.forceCb)
         # self.forceSub = rospy.Subscriber('/dvrk/PSM2/wrench_body_current',
         #                                  WrenchStamped, self.forceCb)
         self.organPoseSub = rospy.Subscriber('registration_pose',
@@ -217,13 +217,13 @@ class Probe2DServer():
 
 
     def forceCb(self,data):
-        curr = self.robot.get_current_position()
-        norm = curr.M.UnitZ()
-        norm = [norm.x(), norm.y(), norm.z()]
-        force = [data.wrench.force.x,data.wrench.force.y,data.wrench.force.z]
-        f = abs(np.dot(force, norm))
-        self.force = [f,f,f,f]
-        # self.force = [data.data1, data.data2, data.data3, data.data4]
+        # curr = self.robot.get_current_position()
+        # norm = curr.M.UnitZ()
+        # norm = [norm.x(), norm.y(), norm.z()]
+        # force = [data.wrench.force.x,data.wrench.force.y,data.wrench.force.z]
+        # f = abs(np.dot(force, norm))
+        # self.force = [f,f,f,f]
+        self.force = [data.data1, data.data2, data.data3, data.data4]
 
     def roiCb(self,data):
         self.roi = data
@@ -367,14 +367,14 @@ class Probe2DServer():
         return displacements.tolist(), forceArray.tolist()
 
 if __name__=="__main__":
-    yamlFile = cleanResourcePath("package://dvrk_vision/defaults/registration_params.yaml")
+    rospy.init_node('probe_2D_server')
+    yamlFile = cleanResourcePath("package://dvrk_vision/defaults/registration_params_cmu.yaml")
     with open(yamlFile, 'r') as stream:
         data = yaml.load(stream)
     cameraTransform = arrayToPyKDLFrame(data['transform'])
     np.set_printoptions(precision=2)
     # print np.matrix(data['transform'])
     # print cameraTransform.M
-    rospy.init_node('probe_2D_server')
     meshPath = rospy.get_param("~mesh_path")
     scale = rospy.get_param("~scale")
     objPath = cleanResourcePath(meshPath)
