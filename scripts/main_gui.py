@@ -49,11 +49,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.tabWidget.addTab(self.roi, "ROI Selection")
         
         self.overlay = OverlayWidget(camera,
-                                     texturePath,
-                                     secondaryMeshPath,
-                                     scale=stlScale,
+                                     texturePath = texturePath,
+                                     meshPath = secondaryMeshPath,
+                                     scale = stlScale,
                                      masterWidget = overlayParent,
                                      parent = self)
+        
         self.tabWidget.addTab(self.overlay, "Stiffness Overlay")
 
         self.otherWindows = []
